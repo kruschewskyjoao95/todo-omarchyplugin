@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "kruschewskyjoao95.daily-tasks",
+  "name": "Tarefas do Dia",
+  "version": "1.0.0",
+  "author": "kruschewskyjoao95",
+  "license": "MIT",
+  "description": "Daily Todos + Tasks & Time Tracker unificados: Big 3, A Fazer/Em Andamento/Em Espera/Concluídas, timer ao vivo, notas e Para Depois — backend em Rust",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Tarefas do Dia",
+    "description": "Big 3 + tarefas com espera, timer ao vivo, notas, progresso do dia e mascote Pip",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "dayStart": 8,
+      "dayEnd": 22,
+      "showCount": true
+    },
+    "schema": [
+      {
+        "key": "dayStart",
+        "type": "number",
+        "label": "Dia começa (hora)"
+      },
+      {
+        "key": "dayEnd",
+        "type": "number",
+        "label": "Dia termina (hora)"
+      },
+      {
+        "key": "showCount",
+        "type": "boolean",
+        "label": "Mostrar contador concluídas/total"
+      }
+    ]
+  }
+}
