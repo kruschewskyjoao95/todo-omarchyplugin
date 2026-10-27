@@ -82,7 +82,7 @@ pub fn fmt_human(sec: u64) -> String {
 pub fn render_markdown(state: &State) -> String {
     let mut out = String::from("# 📋 Tarefas do Dia\n\n");
     if !state.notes.is_empty() {
-        out.push_str("## 📝 Notas\n");
+        out.push_str("## ⏳ Enviado para aprovação\n");
         for n in &state.notes {
             out.push_str(&format!("- [{}] {} <!-- id:{} -->\n", if n.done { "x" } else { " " }, n.text, n.id));
         }

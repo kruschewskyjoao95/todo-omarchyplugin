@@ -211,7 +211,7 @@ fn main() {
         return;
     }
     if cmd == "help" || cmd == "--help" || cmd == "-h" {
-        println!("omarchy-daily-tasks <state|status|add|add-later|add-note|start|pause|standby|complete|set-status|rename|delete|toggle-big3|reorder|clear-done|pull-later|defer|note-toggle|note-edit|note-delete|copy> [argumentos]");
+        println!("omarchy-daily-tasks <state|status|add|add-later|add-note|start|pause|standby|complete|set-status|rename|delete|toggle-big3|reorder|clear-done|pull-later|defer|note-toggle|note-edit|note-delete|task-to-note|note-to-task|copy> [argumentos]");
         return;
     }
 
@@ -344,6 +344,41 @@ fn main() {
         "note-delete" => {
             state.notes.retain(|n| n.id != arg(1));
             dirty = true;
+        }
+        "task-to-note" => {
+            let id = arg(1);
+            let day = state.today_mut(&today);
+            if let Some(pos) = day.tasks.iter().position(|t| t.id == id) {
+                let mut t = day.tasks.remove(pos);
+                t.stop_timer(now_epoch());
+                if state.notes.len() < MAX_NOTES {
+                    state.notes.insert(0, Note {
+                        id: t.id,
+                        text: t.text,
+                        done: t.status.is_done(),
+                        created_at: if !t.created_at.is_empty() { t.created_at } else { now_iso() },
+                    });
+                }
+                dirty = true;
+            }
+        }
+        "note-to-task" => {
+            let id = arg(1);
+            if let Some(pos) = state.notes.iter().position(|n| n.id == id) {
+                let n = state.notes.remove(pos);
+                let day = state.today_mut(&today);
+                if day.tasks.len() < MAX_TASKS_PER_DAY {
+                    let mut task = Task::new(n.id, n.text, &today, false, n.created_at);
+                    if n.done {
+                        task.status = Status::Done;
+                        task.completed_at = Some(now_iso());
+                    } else {
+                        task.status = Status::Todo;
+                    }
+                    day.tasks.push(task);
+                }
+                dirty = true;
+            }
         }
         other => {
             eprintln!("omarchy-daily-tasks: unknown command '{other}'");

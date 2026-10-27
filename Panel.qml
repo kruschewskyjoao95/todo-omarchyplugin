@@ -109,6 +109,27 @@ Item {
     return Util.alpha(Color.accent, alphas[Math.max(0, Math.min(3, (cell.level || 1) - 1))])
   }
 
+  function moveItemToTab(itemObj, isNote, targetTab) {
+    if (!itemObj) return
+    var id = itemObj.id
+    if (isNote) {
+      if (targetTab === "notes") return
+      root.run(["note-to-task", id])
+      if (targetTab === "in_progress") root.run(["start", id])
+      else if (targetTab === "standby") root.run(["set-status", id, "standby"])
+      else if (targetTab === "done") root.run(["complete", id])
+      else if (targetTab === "todo") root.run(["set-status", id, "todo"])
+    } else {
+      if (targetTab === "notes") {
+        root.run(["task-to-note", id])
+      } else {
+        if (targetTab === "in_progress") root.run(["start", id])
+        else if (targetTab === "standby") root.run(["set-status", id, "standby"])
+        else if (targetTab === "done") root.run(["complete", id])
+        else if (targetTab === "todo") root.run(["set-status", id, "todo"])
+      }
+    }
+  }
   function countFor(tab) {
     var _ = dataVersion
     if (tab === "notes") return allNotes.length
@@ -267,7 +288,7 @@ Item {
               { id: "in_progress", name: "Andamento" },
               { id: "standby", name: "Em Espera" },
               { id: "done", name: "Concluídas" },
-              { id: "notes", name: "Notas" }
+              { id: "notes", name: "Aprovação" }
             ]
             readonly property real cellWidth: (width - spacing * (tabDefs.length - 1)) / tabDefs.length
             Repeater {
@@ -311,7 +332,7 @@ Item {
               QQC.TextField {
                 id: itemInput
                 Layout.fillWidth: true
-                placeholderText: root.activeTab === "notes" ? "Adicionar nova nota..." : (root.big3Mode ? "Adicionar tarefa do Big 3..." : "Adicionar nova tarefa...")
+                placeholderText: root.activeTab === "notes" ? "Adicionar enviado para aprovação..." : (root.big3Mode ? "Adicionar tarefa do Big 3..." : "Adicionar nova tarefa...")
                 placeholderTextColor: Util.alpha(root.foreground, 0.4)
                 color: root.foreground
                 font.family: root.fontFamily
@@ -372,7 +393,7 @@ Item {
             width: parent.width
             topPadding: Style.space(20)
             bottomPadding: Style.space(20)
-            text: root.activeTab === "notes" ? "Nenhuma nota ainda.\nDigite acima para adicionar uma."
+            text: root.activeTab === "notes" ? "Nenhum item enviado para aprovação ainda.\nDigite acima para adicionar um."
               : root.activeTab === "standby" ? "Nada em espera.\nPause uma tarefa em andamento e ela vem para cá."
               : "Nenhuma tarefa aqui.\nDigite acima para adicionar uma."
             color: Util.alpha(root.foreground, 0.7)
@@ -547,31 +568,57 @@ Item {
                   Layout.alignment: Qt.AlignVCenter
                   Repeater {
                     model: {
-                      if (card.isNote) return [{ a: "copy", t: "⧉" }, { a: "toggle", t: itemObj.done ? "↺" : "✓" }, { a: "edit", t: "✎" }, { a: "delete", t: "✕" }]
                       var acts = []
-                      if (itemObj.status !== "done") acts.push({ a: "complete", t: "✓" })
-                      if (itemObj.status === "in_progress") acts.push({ a: "standby", t: "⏸" })
-                      if (itemObj.status !== "done") acts.push({ a: "star", t: itemObj.big3 ? "★" : "☆" })
-                      if (itemObj.status !== "done") acts.push({ a: "defer", t: "↓" })
-                      acts.push({ a: "edit", t: "✎" })
-                      acts.push({ a: "delete", t: "✕" })
+                      if (card.isNote) {
+                        // Está em Aprovação -> pode mover para A Fazer, Andamento, Em Espera, Concluídas
+                        acts.push({ a: "mov-todo", t: "📋", tip: "Mover para A Fazer" })
+                        acts.push({ a: "mov-in_progress", t: "▶", tip: "Iniciar (Andamento)" })
+                        acts.push({ a: "mov-standby", t: "⏸", tip: "Mover para Em Espera" })
+                        acts.push({ a: "mov-done", t: "✓", tip: "Mover para Concluídas" })
+                        acts.push({ a: "sep" })
+                        acts.push({ a: "copy", t: "⧉", tip: "Copiar texto" })
+                        acts.push({ a: "toggle", t: itemObj.done ? "↺" : "✔", tip: itemObj.done ? "Reabrir item" : "Marcar resolvido" })
+                        acts.push({ a: "edit", t: "✎", tip: "Editar" })
+                        acts.push({ a: "delete", t: "✕", tip: "Apagar" })
+                        return acts
+                      }
+
+                      // Está em Tarefas (A Fazer / Andamento / Em Espera / Concluídas)
+                      // Destinos disponíveis exceto o estado atual:
+                      if (itemObj.status !== "todo") acts.push({ a: "mov-todo", t: "📋", tip: "Mover para A Fazer" })
+                      if (itemObj.status !== "in_progress") acts.push({ a: "mov-in_progress", t: "▶", tip: "Mover para Andamento (iniciar timer)" })
+                      if (itemObj.status !== "standby") acts.push({ a: "mov-standby", t: "⏸", tip: "Mover para Em Espera" })
+                      if (itemObj.status !== "done") acts.push({ a: "mov-done", t: "✓", tip: "Concluir tarefa" })
+                      acts.push({ a: "mov-approval", t: "⏳", tip: "Mover para Aprovação" })
+
+                      acts.push({ a: "sep" })
+
+                      // Big 3 e Para Depois
+                      if (itemObj.status !== "done") acts.push({ a: "star", t: itemObj.big3 ? "★" : "☆", tip: itemObj.big3 ? "Remover do Big 3" : "Tornar Big 3" })
+                      if (itemObj.status !== "done") acts.push({ a: "defer", t: "↓", tip: "Mover Para Depois" })
+                      acts.push({ a: "edit", t: "✎", tip: "Editar texto" })
+                      acts.push({ a: "delete", t: "✕", tip: "Apagar tarefa" })
                       return acts
                     }
                     Rectangle {
                       required property var modelData
-                      width: Style.space(24); height: Style.space(24); radius: Style.space(5)
-                      color: actMouse.containsMouse ? Util.alpha(root.foreground, 0.12) : "transparent"
+                      visible: modelData.a !== "sep"
+                      width: Style.space(22); height: Style.space(22); radius: Style.space(4)
+                      color: actMouse.containsMouse ? Util.alpha(root.foreground, 0.14) : "transparent"
                       Text {
-                        anchors.centerIn: parent; text: modelData.t
-                        color: modelData.a === "delete" ? Color.urgent : root.foreground
+                        anchors.centerIn: parent; text: modelData.t || ""
+                        color: modelData.a === "delete" ? Color.urgent : (modelData.a && modelData.a.indexOf("mov-") === 0 ? Color.accent : root.foreground)
                         font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true
                       }
                       MouseArea {
                         id: actMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: {
                           var id = itemObj.id, a = modelData.a
-                          if (a === "complete") root.run(["complete", id])
-                          else if (a === "standby") root.run(["pause", id])
+                          if (a === "mov-todo") root.moveItemToTab(itemObj, card.isNote, "todo")
+                          else if (a === "mov-in_progress") root.moveItemToTab(itemObj, card.isNote, "in_progress")
+                          else if (a === "mov-standby") root.moveItemToTab(itemObj, card.isNote, "standby")
+                          else if (a === "mov-done") root.moveItemToTab(itemObj, card.isNote, "done")
+                          else if (a === "mov-approval") root.moveItemToTab(itemObj, false, "notes")
                           else if (a === "star") root.run(["toggle-big3", id])
                           else if (a === "defer") root.run(["defer", id])
                           else if (a === "edit") root.editingId = id
@@ -579,6 +626,11 @@ Item {
                           else if (a === "toggle") root.run(["note-toggle", id])
                           else if (a === "copy") { copyProc.command = [root.binPath, "copy", itemObj.text || ""]; copyProc.running = true }
                         }
+                      }
+                      PanelToolTip {
+                        visible: actMouse.containsMouse && modelData.tip !== undefined
+                        text: modelData.tip || ""
+                        fontFamily: root.fontFamily
                       }
                     }
                   }
@@ -614,8 +666,24 @@ Item {
                   font.family: root.fontFamily; font.pixelSize: Style.font.body; elide: Text.ElideRight
                 }
                 Text {
-                  text: "↑ hoje"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+                  text: "📋 hoje"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
                   MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.run(["pull-later", modelData.id]) }
+                }
+                Text {
+                  text: "⏳"; color: Util.alpha(root.foreground, 0.75); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+                  MouseArea {
+                    id: laterApproveMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      root.run(["pull-later", modelData.id])
+                      root.run(["task-to-note", modelData.id])
+                      root.activeTab = "notes"
+                    }
+                  }
+                  PanelToolTip {
+                    visible: laterApproveMouse.containsMouse
+                    text: "Mover direto para Aprovação"
+                    fontFamily: root.fontFamily
+                  }
                 }
                 Text {
                   text: "✕"; color: Color.urgent; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
